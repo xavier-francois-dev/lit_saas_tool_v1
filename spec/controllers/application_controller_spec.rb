@@ -10,16 +10,39 @@ RSpec.describe ApplicationController, type: :controller do
   end
 
   describe 'authenticate_user' do
-    it 'allows access when user is logged in' do
-      user = FactoryBot.create(:user)
-      session[:user_id] = user.id
-      get :index
-      expect(response).to have_http_status(:ok)
+    let!(:user) { create(:user) }
+
+    context 'with session-based authentication' do
+      it 'allows access when user is logged in' do
+        session[:user_id] = user.id
+        get :index
+        expect(response).to have_http_status(:ok)
+      end
+
+      it 'denies access when user is not logged in' do
+        get :index
+        expect(response).to have_http_status(:unauthorized)
+      end
     end
 
-    it 'denies access when user is not logged in' do
-      get :index
-      expect(response).to have_http_status(:unauthorized)
+    context 'with JWT-based authentication' do
+      it 'allows access when valid JWT token is provided' do
+        token = JwtService.encode(user_id: user.id)
+        request.headers['Authorization'] = "Bearer #{token}"
+        get :index
+        expect(response).to have_http_status(:ok)
+      end
+
+      it 'denies access when invalid JWT token is provided' do
+        request.headers['Authorization'] = "Bearer invalid_token"
+        get :index
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'denies access when no JWT token is provided' do
+        get :index
+        expect(response).to have_http_status(:unauthorized)
+      end
     end
   end
 end
